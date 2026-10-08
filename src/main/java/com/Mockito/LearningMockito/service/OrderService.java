@@ -1,5 +1,6 @@
 package com.Mockito.LearningMockito.service;
 
+import com.Mockito.LearningMockito.client.NotificationClient;
 import com.Mockito.LearningMockito.client.PaymentClient;
 import com.Mockito.LearningMockito.exception.PaymetFailedExecption;
 import com.Mockito.LearningMockito.model.Order;
@@ -18,11 +19,13 @@ public class OrderService {
 
     private final OrderRespository orderRespository;
     private final PaymentClient paymentClient;
+    private final NotificationClient notificationClient;
 
-    public OrderService(OrderRespository orderRespository,PaymentClient paymentClient)
+    public OrderService(OrderRespository orderRespository,PaymentClient paymentClient,NotificationClient notificationClient)
     {
         this.orderRespository=orderRespository;
         this.paymentClient=paymentClient;
+        this.notificationClient  = notificationClient;
     }
 
     public Order placeOrder(String customerId, BigDecimal amount){
@@ -41,6 +44,9 @@ public class OrderService {
 
         Order order = new Order(customerId,amount, OrderStatus.CONFIRMED);
         Order saved = orderRespository.save(order);
+
+
+        notificationClient.sendConfirmation(customerId,saved.getId()); //runs after save.
         log.info("Order {} confirmed for customer {}",saved.getId(),saved.getCustomerId());
         return saved ;
 

@@ -1,5 +1,6 @@
 package com.Mockito.LearningMockito.service;
 
+import com.Mockito.LearningMockito.client.NotificationClient;
 import com.Mockito.LearningMockito.client.PaymentClient;
 import com.Mockito.LearningMockito.exception.PaymetFailedExecption;
 import com.Mockito.LearningMockito.model.Order;
@@ -11,14 +12,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.verify;
 import static org.mockito.ArgumentMatchers.any;
 
 import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 public class OrderServiceTest {
@@ -28,6 +27,9 @@ public class OrderServiceTest {
 
     @Mock
     private PaymentClient paymentClient;
+
+    @Mock
+    private NotificationClient notificationClient;
 
     @InjectMocks
     private  OrderService orderService;
@@ -76,6 +78,33 @@ public class OrderServiceTest {
 
         // ASSERT (behavior)
         verify(orderRespository,never()).save(any(Order.class));
+
+
+    }
+
+    // Test 3
+    @Test
+    void placeOrder_whenPaymentSucceeds_sendsConfirmationNotification(){
+
+        //Arrange
+        String customerId = "cust-3";
+        BigDecimal amount  = new BigDecimal("750.00");
+
+        when(paymentClient.charge(customerId,amount)).thenReturn(true);
+
+        when(orderRespository.save(any(Order.class))).thenAnswer(invocation ->{
+            Order o = invocation.getArgument(0);
+            o.setId(10L);
+            return o;
+        });
+
+        doNothing().when(notificationClient).sendConfirmation(customerId,10L);
+
+        //ACT
+        orderService.placeOrder(customerId,amount);
+
+        //ASSERT
+        verify(notificationClient).sendConfirmation(customerId,10L);
 
 
     }
