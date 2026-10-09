@@ -34,6 +34,7 @@ public class OrderService {
 
         }
 
+
         boolean paymentSuccess = paymentClient.charge(customerId,amount);
 
         if(!paymentSuccess)
@@ -44,6 +45,7 @@ public class OrderService {
 
         Order order = new Order(customerId,amount, OrderStatus.CONFIRMED);
         Order saved = orderRespository.save(order);
+
 
 
         notificationClient.sendConfirmation(customerId,saved.getId()); //runs after save.

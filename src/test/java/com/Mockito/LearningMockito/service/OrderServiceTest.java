@@ -8,15 +8,16 @@ import com.Mockito.LearningMockito.model.OrderStatus;
 import com.Mockito.LearningMockito.repository.OrderRespository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import static org.assertj.core.api.Assertions.assertThat;
+
+import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 
 import java.math.BigDecimal;
 
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -108,5 +109,38 @@ public class OrderServiceTest {
 
 
     }
+
+    // Test 4
+    @Test
+    void placeOrder_whenPaymentSuceeds_chargesThenSavesThenNotifies(){
+
+        //ARRANGE
+        String customerId = "cust-4";
+        BigDecimal amount = new BigDecimal("900.0");
+
+        when(paymentClient.charge(customerId,amount)).thenReturn(true);
+
+        when(orderRespository.save(any(Order.class))).thenAnswer(invocation ->{
+           Order o = invocation.getArgument(0);
+           o.setId(20L);
+           return o;
+        });
+
+        //ACT
+        orderService.placeOrder(customerId,amount);
+
+        //ASSERT (order of interactions across all three mocks)
+        InOrder inOrder = inOrder(paymentClient,orderRespository,notificationClient);
+        inOrder.verify(paymentClient).charge(customerId,amount);
+        inOrder.verify(orderRespository).save(any(Order.class));
+        inOrder.verify(notificationClient).sendConfirmation(customerId,20L);
+
+
+
+
+
+    }
+
+
 
 }
