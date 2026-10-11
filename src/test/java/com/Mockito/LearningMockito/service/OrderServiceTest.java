@@ -141,6 +141,35 @@ public class OrderServiceTest {
 
     }
 
+    //Test 5
+    @Test
+    void placeOrder_whenNotificationFails_stillReturnsConfirmedOrder(){
+
+        // ARRANGE
+        String customerId = "cust-5";
+        BigDecimal amount = new BigDecimal("400.00");
+
+        when(paymentClient.charge(customerId, amount)).thenReturn(true);
+
+        when(orderRespository.save(any(Order.class)))
+                .thenAnswer(invocation -> {
+                    Order o = invocation.getArgument(0);
+                    o.setId(30L);
+                    return o;
+                });
+
+        doThrow(new RuntimeException("Notification service down"))
+                .when(notificationClient).sendConfirmation(customerId, 30L);
+
+        // ACT
+        Order result = orderService.placeOrder(customerId, amount);
+
+        // ASSERT
+        assertThat(result.getId()).isEqualTo(30L);
+        assertThat(result.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+        verify(notificationClient).sendConfirmation(customerId, 30L);
+    }
+
 
 
 }

@@ -47,8 +47,12 @@ public class OrderService {
         Order saved = orderRespository.save(order);
 
 
+        try{
+            notificationClient.sendConfirmation(customerId,saved.getId()); //runs after save.
+        }catch(Exception e){
+            log.error("Failed to send confirmation for order {}", saved.getId(), e);
+        }
 
-        notificationClient.sendConfirmation(customerId,saved.getId()); //runs after save.
         log.info("Order {} confirmed for customer {}",saved.getId(),saved.getCustomerId());
         return saved ;
 
