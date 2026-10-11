@@ -220,5 +220,29 @@ public class OrderServiceTest {
 
     }
 
+    //Test 8
+    @Test
+    void placeOrder_whenPaymentSucceeds_hasNoUnexpectedInteractions() {
+        // ARRANGE
+        String customerId = "cust-8";
+        BigDecimal amount = new BigDecimal("350.00");
+
+        when(paymentClient.charge(customerId, amount)).thenReturn(true);
+
+        when(orderRespository.save(any(Order.class)))
+                .thenAnswer(invocation -> {
+                    Order o = invocation.getArgument(0);
+                    o.setId(40L);
+                    return o;
+                });
+
+        // ACT
+        orderService.placeOrder(customerId, amount);
+
+        // ASSERT
+        verify(notificationClient).sendConfirmation(customerId, 40L);
+        verifyNoMoreInteractions(paymentClient, orderRespository, notificationClient);
+    }
+
 
 }
