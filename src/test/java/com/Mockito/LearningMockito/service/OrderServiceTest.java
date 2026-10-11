@@ -8,6 +8,7 @@ import com.Mockito.LearningMockito.model.OrderStatus;
 import com.Mockito.LearningMockito.repository.OrderRespository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -170,6 +171,7 @@ public class OrderServiceTest {
         verify(notificationClient).sendConfirmation(customerId, 30L);
     }
 
+    // Test 6
     @Test
     void placeOrder_whenPaymentFails_neverTouchesRepositoryOrNotifier(){
 
@@ -188,6 +190,35 @@ public class OrderServiceTest {
 
     }
 
+    //Test 7
+    @Test
+    void placeOrder_whenPaymentSucceeds_savesOrderWithCorrectFields(){
+
+        //ARRANGE
+        String customerId = "cust-7";
+        BigDecimal amount = new BigDecimal("600.00");
+
+        when(paymentClient.charge(customerId,amount)).thenReturn(true);
+
+        when(orderRespository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ArgumentCaptor<Order>orderCaptor = ArgumentCaptor.forClass(Order.class);
+
+        //ACT
+        orderService.placeOrder(customerId,amount);
+
+        //ASSERT
+        verify(orderRespository).save(orderCaptor.capture());
+        Order savedOrder = orderCaptor.getValue();
+
+        assertThat(savedOrder.getCustomerId()).isEqualTo(customerId);
+        assertThat(savedOrder.getAmount()).isEqualByComparingTo(amount);
+        assertThat(savedOrder.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+
+
+
+
+    }
 
 
 }
