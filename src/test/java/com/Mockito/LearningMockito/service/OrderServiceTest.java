@@ -170,6 +170,24 @@ public class OrderServiceTest {
         verify(notificationClient).sendConfirmation(customerId, 30L);
     }
 
+    @Test
+    void placeOrder_whenPaymentFails_neverTouchesRepositoryOrNotifier(){
+
+        //ARRANGE
+        String customerId = "cust-6";
+        BigDecimal amount = new BigDecimal("250.00");
+
+        when(paymentClient.charge(customerId,amount)).thenReturn(false);
+
+        // ACT + ASSERT (exception)
+        assertThatThrownBy(()->orderService.placeOrder(customerId,amount)).isInstanceOf(PaymetFailedExecption.class);
+
+        //ASSERT (nothing downstream was touched)
+        verifyNoInteractions(orderRespository,notificationClient);
+
+
+    }
+
 
 
 }
