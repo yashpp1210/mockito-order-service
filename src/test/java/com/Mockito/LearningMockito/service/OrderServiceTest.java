@@ -1,5 +1,6 @@
 package com.Mockito.LearningMockito.service;
 
+import com.Mockito.LearningMockito.client.NotificationClient;
 import com.Mockito.LearningMockito.client.PaymentClient;
 import com.Mockito.LearningMockito.exception.PaymetFailedExecption;
 import com.Mockito.LearningMockito.model.Order;
@@ -7,18 +8,18 @@ import com.Mockito.LearningMockito.model.OrderStatus;
 import com.Mockito.LearningMockito.repository.OrderRespository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.verify;
+
+import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 
 import java.math.BigDecimal;
 
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 public class OrderServiceTest {
@@ -28,6 +29,9 @@ public class OrderServiceTest {
 
     @Mock
     private PaymentClient paymentClient;
+
+    @Mock
+    private NotificationClient notificationClient;
 
     @InjectMocks
     private  OrderService orderService;
@@ -79,5 +83,166 @@ public class OrderServiceTest {
 
 
     }
+
+    // Test 3
+    @Test
+    void placeOrder_whenPaymentSucceeds_sendsConfirmationNotification(){
+
+        //Arrange
+        String customerId = "cust-3";
+        BigDecimal amount  = new BigDecimal("750.00");
+
+        when(paymentClient.charge(customerId,amount)).thenReturn(true);
+
+        when(orderRespository.save(any(Order.class))).thenAnswer(invocation ->{
+            Order o = invocation.getArgument(0);
+            o.setId(10L);
+            return o;
+        });
+
+        doNothing().when(notificationClient).sendConfirmation(customerId,10L);
+
+        //ACT
+        orderService.placeOrder(customerId,amount);
+
+        //ASSERT
+        verify(notificationClient).sendConfirmation(customerId,10L);
+
+
+    }
+
+    // Test 4
+    @Test
+    void placeOrder_whenPaymentSuceeds_chargesThenSavesThenNotifies(){
+
+        //ARRANGE
+        String customerId = "cust-4";
+        BigDecimal amount = new BigDecimal("900.0");
+
+        when(paymentClient.charge(customerId,amount)).thenReturn(true);
+
+        when(orderRespository.save(any(Order.class))).thenAnswer(invocation ->{
+           Order o = invocation.getArgument(0);
+           o.setId(20L);
+           return o;
+        });
+
+        //ACT
+        orderService.placeOrder(customerId,amount);
+
+        //ASSERT (order of interactions across all three mocks)
+        InOrder inOrder = inOrder(paymentClient,orderRespository,notificationClient);
+        inOrder.verify(paymentClient).charge(customerId,amount);
+        inOrder.verify(orderRespository).save(any(Order.class));
+        inOrder.verify(notificationClient).sendConfirmation(customerId,20L);
+
+
+
+
+
+    }
+
+    //Test 5
+    @Test
+    void placeOrder_whenNotificationFails_stillReturnsConfirmedOrder(){
+
+        // ARRANGE
+        String customerId = "cust-5";
+        BigDecimal amount = new BigDecimal("400.00");
+
+        when(paymentClient.charge(customerId, amount)).thenReturn(true);
+
+        when(orderRespository.save(any(Order.class)))
+                .thenAnswer(invocation -> {
+                    Order o = invocation.getArgument(0);
+                    o.setId(30L);
+                    return o;
+                });
+
+        doThrow(new RuntimeException("Notification service down"))
+                .when(notificationClient).sendConfirmation(customerId, 30L);
+
+        // ACT
+        Order result = orderService.placeOrder(customerId, amount);
+
+        // ASSERT
+        assertThat(result.getId()).isEqualTo(30L);
+        assertThat(result.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+        verify(notificationClient).sendConfirmation(customerId, 30L);
+    }
+
+    // Test 6
+    @Test
+    void placeOrder_whenPaymentFails_neverTouchesRepositoryOrNotifier(){
+
+        //ARRANGE
+        String customerId = "cust-6";
+        BigDecimal amount = new BigDecimal("250.00");
+
+        when(paymentClient.charge(customerId,amount)).thenReturn(false);
+
+        // ACT + ASSERT (exception)
+        assertThatThrownBy(()->orderService.placeOrder(customerId,amount)).isInstanceOf(PaymetFailedExecption.class);
+
+        //ASSERT (nothing downstream was touched)
+        verifyNoInteractions(orderRespository,notificationClient);
+
+
+    }
+
+    //Test 7
+    @Test
+    void placeOrder_whenPaymentSucceeds_savesOrderWithCorrectFields(){
+
+        //ARRANGE
+        String customerId = "cust-7";
+        BigDecimal amount = new BigDecimal("600.00");
+
+        when(paymentClient.charge(customerId,amount)).thenReturn(true);
+
+        when(orderRespository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ArgumentCaptor<Order>orderCaptor = ArgumentCaptor.forClass(Order.class);
+
+        //ACT
+        orderService.placeOrder(customerId,amount);
+
+        //ASSERT
+        verify(orderRespository).save(orderCaptor.capture());
+        Order savedOrder = orderCaptor.getValue();
+
+        assertThat(savedOrder.getCustomerId()).isEqualTo(customerId);
+        assertThat(savedOrder.getAmount()).isEqualByComparingTo(amount);
+        assertThat(savedOrder.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+
+
+
+
+    }
+
+    //Test 8
+    @Test
+    void placeOrder_whenPaymentSucceeds_hasNoUnexpectedInteractions() {
+        // ARRANGE
+        String customerId = "cust-8";
+        BigDecimal amount = new BigDecimal("350.00");
+
+        when(paymentClient.charge(customerId, amount)).thenReturn(true);
+
+        when(orderRespository.save(any(Order.class)))
+                .thenAnswer(invocation -> {
+                    Order o = invocation.getArgument(0);
+                    o.setId(40L);
+                    return o;
+                });
+
+        // ACT
+        orderService.placeOrder(customerId, amount);
+
+        // ASSERT
+        verify(notificationClient).sendConfirmation(customerId, 40L);
+        verifyNoMoreInteractions(paymentClient, orderRespository, notificationClient);
+    }
+
 
 }
