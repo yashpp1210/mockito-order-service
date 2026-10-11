@@ -45,7 +45,6 @@ public class OrderService {
 
         Order order = new Order(customerId,amount, OrderStatus.CONFIRMED);
         Order saved = orderRespository.save(order);
-        long total = orderRespository.count();
 
         try{
             notificationClient.sendConfirmation(customerId,saved.getId()); //runs after save.
